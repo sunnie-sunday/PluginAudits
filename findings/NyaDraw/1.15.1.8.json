@@ -1,0 +1,80 @@
+{
+	"plugin": "NyaDraw",
+	"version": "1.15.1.8",
+	"build": {
+		"NyaDraw/1.15.1.8/latest.zip": "fe044e9fbb3ec655bd93aada408cd1f93f5701afa56a364ef02fbd4291537073",
+		"NyaDraw/1.15.1.8/NyaDraw.dll": "fe2649d6ddc023724c748565cbedd7b55caac35f3c870ee2ac37fe5a5839d0f0"
+	},
+	"reproduce": {
+		"command": "dotnet run --project PluginAudits.DailyRoutines -c Release -- plugins/NyaDraw/1.15.1.8/latest.zip -o decrypted/NyaDraw/1.15.1.8",
+		"output": "decrypted/NyaDraw/1.15.1.8"
+	},
+	"notes": "Evidence paths are relative to the output folder. Hardcoded keys found in the plugin (an RSA private key, an AES key and a one-time-password key) are deliberately not quoted.",
+	"findings": [
+		{
+			"id": "licence-server",
+			"description": "Contacts licence servers at https://auth.n3ko.fun/ and https://auth.n4ko.com/ on the path api/v1/query.",
+			"evidence": [
+				{ "file": "NyaDraw/fMwuop6sAL4hheXE8fR/KXc6ls695GVkHQfk1ir.cs", "contains": "BaseAddress = new Uri(\"https://auth.n3ko.fun/\")" },
+				{ "file": "NyaDraw/fMwuop6sAL4hheXE8fR/KXc6ls695GVkHQfk1ir.cs", "contains": "BaseAddress = new Uri(\"https://auth.n4ko.com/\")" },
+				{ "file": "NyaDraw/fMwuop6sAL4hheXE8fR/KXc6ls695GVkHQfk1ir.cs", "contains": "await UUv6f8tEMM(\"api/v1/query\", text)" }
+			]
+		},
+		{
+			"id": "account-id-raw-read",
+			"description": "Reads the user's own Account ID without naming it: it calls the game's account-record getter, found by the signature 48 8B 05 ?? ?? ?? ?? C3 CC … 83 39, and reads 8 bytes at offset 8 of the result.",
+			"evidence": [
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "private static readonly string wwwWL2x2We = \"48 8B 05 ?? ?? ?? ?? C3 CC CC CC CC CC CC CC CC 83 39\";" },
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "ulong num = *(ulong*)(Marshal.GetDelegateForFunctionPointer<k5leyxUMNA55IwQJFsI>(Svc.SigScanner.ScanText(wwwWL2x2We))() + 8);" }
+			]
+		},
+		{
+			"id": "credential-format",
+			"description": "Turns identifiers into credentials as MD5(\"NekoV#\" + value).",
+			"evidence": [
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "internal static string xTyWsdAXFC = \"NekoV#\";" },
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "return JBQWd5vjRe(P_0, xTyWsdAXFC);" },
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "return Y6aNJWWPPjPaMPkX19C.rGgWkbkHhB(P_1 + P_0);" },
+				{ "file": "NyaDraw/CB4s6IWecsPtcJnB7G7/Y6aNJWWPPjPaMPkX19C.cs", "contains": "internal static UInt128 rGgWkbkHhB(string P_0)" },
+				{ "file": "NyaDraw/CB4s6IWecsPtcJnB7G7/Y6aNJWWPPjPaMPkX19C.cs", "contains": "MD5.HashData(WkqWE1J9oy(P_0))" }
+			]
+		},
+		{
+			"id": "hardware-fingerprint",
+			"description": "Builds a hardware fingerprint from the motherboard serial number, the processor ID and fixed-disk serial numbers read through WMI, hashed with SHA-256.",
+			"evidence": [
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "(\"SELECT SerialNumber FROM Win32_BaseBoard\", \"SerialNumber\", true)" },
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "(\"SELECT ProcessorId FROM Win32_Processor\", \"ProcessorId\", true)" },
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "SELECT SerialNumber, Size, Model FROM Win32_DiskDrive" },
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "ManagementObjectSearcher managementObjectSearcher = new ManagementObjectSearcher(P_0);" },
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(stringBuilder.ToString())))" }
+			]
+		},
+		{
+			"id": "licence-checks",
+			"description": "Sends the hardware credential (type 2) and the Account ID credential (type 3) to the licence server, each with the plugin ID and the client language.",
+			"evidence": [
+				{ "file": "NyaDraw/Ve1xdRXvQ1iPqeqq8Ns/znl587XIPGfyOPOH0q1.cs", "contains": "FAfWcuLiEk.w0E6plMGiN(Ml2WFZWQB9, mYUK49WrPQwiLj2irrn.zRXWjqlaYA(), 2)" },
+				{ "file": "NyaDraw/Ve1xdRXvQ1iPqeqq8Ns/znl587XIPGfyOPOH0q1.cs", "contains": "FAfWcuLiEk.w0E6plMGiN(Ml2WFZWQB9, mYUK49WrPQwiLj2irrn.zHdWlxDMkA(), 3)" },
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "return mEBWHRCR6w(Y8MWS9jima());" },
+				{ "file": "NyaDraw/Px3TFiWKvVZ7D0khPxF/mYUK49WrPQwiLj2irrn.cs", "contains": "return mEBWHRCR6w(JbMWU4ZCLh());" },
+				{ "file": "NyaDraw/fMwuop6sAL4hheXE8fR/KXc6ls695GVkHQfk1ir.cs", "contains": "FZpW12p9mo = P_1," },
+				{ "file": "NyaDraw/fMwuop6sAL4hheXE8fR/KXc6ls695GVkHQfk1ir.cs", "contains": "WbyWAkJk1a = P_2," },
+				{ "file": "NyaDraw/fMwuop6sAL4hheXE8fR/KXc6ls695GVkHQfk1ir.cs", "contains": "ucTWuG3Ky5 = (ushort)Svc.ClientState.ClientLanguage" }
+			]
+		},
+		{
+			"id": "machine-code-token",
+			"description": "A \"machine code\" button copies to the clipboard an AES-encrypted token holding the character's name and home world, the Content ID and the raw Account ID.",
+			"evidence": [
+				{ "file": "NyaDraw/iV5GBuWIGiQJcabSn9V/bX23U3WifFN4PK0oApM.cs", "contains": "Player = obj + text + (string?)obj2," },
+				{ "file": "NyaDraw/iV5GBuWIGiQJcabSn9V/bX23U3WifFN4PK0oApM.cs", "contains": "CID = $\"{Svc.PlayerState.ContentId}\"," },
+				{ "file": "NyaDraw/iV5GBuWIGiQJcabSn9V/bX23U3WifFN4PK0oApM.cs", "contains": "AID = mYUK49WrPQwiLj2irrn.Y8MWS9jima()," },
+				{ "file": "NyaDraw/iV5GBuWIGiQJcabSn9V/bX23U3WifFN4PK0oApM.cs", "contains": "using Aes aes = Aes.Create();" },
+				{ "file": "NyaDraw/KBUtu0NrB6GRCwMlvW/puwX9LuqVeFNEov90l.cs", "contains": "\"NekoVerify-MachineCode\".guDJj627Z0()" },
+				{ "file": "NyaDraw/KBUtu0NrB6GRCwMlvW/puwX9LuqVeFNEov90l.cs", "contains": "bX23U3WifFN4PK0oApM.iQHWv2DLZo(znl587XIPGfyOPOH0q1.YjGXRkCnvx())" },
+				{ "file": "NyaDraw/KBUtu0NrB6GRCwMlvW/puwX9LuqVeFNEov90l.cs", "contains": "ImGui.SetClipboardText(clipboardText);" }
+			]
+		}
+	]
+}

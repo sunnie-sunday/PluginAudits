@@ -1,0 +1,159 @@
+{
+	"plugin": "DailyRoutines",
+	"version": "2.0.2.5",
+	"build": {
+		"DailyRoutines/2.0.2.5/latest.zip": "82e721377731889d543ebeb40e48ef339fc27011f34b0ccea77e0fd53a64a81c",
+		"DailyRoutines/2.0.2.5/DailyRoutines.dll": "4fd23ca91e70ed337fbb60735156da11f231586c7ee5e52aa22e10fcdffefff3",
+		"DailyRoutines/2.0.2.5/OmenTools.dll": "edff694b93f8be9c1e3817c746393ee3c80814b65693eea914895e86b2a199f9"
+	},
+	"reproduce": {
+		"command": "dotnet run --project PluginAudits.DailyRoutines -c Release -- plugins/DailyRoutines/2.0.2.5/latest.zip -o decrypted/DailyRoutines/2.0.2.5",
+		"output": "decrypted/DailyRoutines/2.0.2.5"
+	},
+	"notes": "Evidence paths are relative to the output folder. Hardcoded tokens and keys found in the plugin are deliberately not quoted. Finding IDs match those of later versions, so the same fact can be compared across builds.",
+	"findings": [
+		{
+			"id": "sightings-upload",
+			"description": "Uploads sightings of other players over plain HTTP to http://103.236.67.155/api/report/cid, in batches of up to 200, sent once 100 are queued.",
+			"evidence": [
+				{ "file": "DailyRoutines/JD8KtglE9fA1f4MHBnH/mu6ac2lFjNtOD19vPQ4.cs", "contains": "[InternalAPIRequestType.ReportCID] = (\"http://103.236.67.155/api/report/cid\", APISourceType.HSS)" },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "if (UploadQueue.Count >= 100)" },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "while (batch.Count < 200 && UploadQueue.TryDequeue(out result))" },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "mu6ac2lFjNtOD19vPQ4.OTnlNHwTFR(InternalAPIRequestType.ReportCID, new { list })" }
+			]
+		},
+		{
+			"id": "sighting-record",
+			"description": "Each sighting holds the player's Content ID, name, home world and its ID, current world and its ID, and region.",
+			"evidence": [
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "content_id = data.ContentID.ToString()," },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "name = data.Name.ToString()," },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "world = data.HomeWorldName.ToString()," },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "world_id = data.HomeWorldID.ToString()," },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "current_world = data.CurrentWorldName.ToString()," },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "current_world_id = data.CurrentWorldID.ToString()," },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "region = data.Region.ToString()" }
+			]
+		},
+		{
+			"id": "source-players-around",
+			"description": "Records the players around the user, as reported by PlayersManager's ReceivePlayersAround event.",
+			"evidence": [
+				{ "file": "DailyRoutines/DailyRoutines.Manager/PlayersManager.cs", "contains": "public delegate void PlayersAroundUpdateDelegate(IReadOnlyList<IPlayerCharacter> characters);" },
+				{ "file": "DailyRoutines/DailyRoutines.Manager/PlayersManager.cs", "contains": "PlayersManager.ReceivePlayersAround?.Invoke(PlayersAroundInternal);" },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "PlayersManager.ReceivePlayersAround += wIvDpA7b4N;" },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "private unsafe static void wIvDpA7b4N(IReadOnlyList<IPlayerCharacter> characters)" }
+			]
+		},
+		{
+			"id": "source-character-lists",
+			"description": "Records players from the game's character lists through a hook on InfoProxyCommonList, the base of the friend list, Free Company and linkshell member lists, Player Search results and others.",
+			"evidence": [
+				{ "file": "DailyRoutines/DailyRoutines.Manager/PlayersManager.cs", "contains": "private unsafe static void Io1ldQraQu(InfoProxyCommonList* infoProxy, nint a2, uint a3)" },
+				{ "file": "DailyRoutines/DailyRoutines.Manager/PlayersManager.cs", "contains": "PlayersManager.ReceivePlayerInfo?.Invoke(new PlayerInfo(val));" },
+				{ "file": "DailyRoutines/YOAnqVDr6mVB65SsAlM/VWVt5nD5l31sJgTaoul.cs", "contains": "PlayersManager.ReceivePlayerInfo += u8XD9LvXqE;" }
+			]
+		},
+		{
+			"id": "source-party-finder",
+			"description": "Records the players behind Party Finder listings.",
+			"evidence": [
+				{ "file": "DailyRoutines/DailyRoutines.Manager/PlayersManager.cs", "contains": "private static void USGlwtqD7X(IPartyFinderListing listing, IPartyFinderListingEventArgs args)" },
+				{ "file": "DailyRoutines/DailyRoutines.Manager/PlayersManager.cs", "contains": "PlayersManager.ReceivePlayerInfo?.Invoke(new PlayerInfo(listing));" }
+			]
+		},
+		{
+			"id": "sightings-credential-header",
+			"description": "Every request to the sightings server carries the user's M credential in a \"credential\" header.",
+			"evidence": [
+				{ "file": "DailyRoutines/JD8KtglE9fA1f4MHBnH/mu6ac2lFjNtOD19vPQ4.cs", "contains": "[APISourceType.HSS] = delegate(HttpClient client)" },
+				{ "file": "DailyRoutines/JD8KtglE9fA1f4MHBnH/mu6ac2lFjNtOD19vPQ4.cs", "contains": "client.DefaultRequestHeaders.Add(\"credential\", fxCkt6Hz1JcfW7XdRkW.D7ElGG7kcd<NbaXopuKFMHh2CyWZO>().Token);" },
+				{ "file": "DailyRoutines/WsJtBbyqvXUPhKaeSa/NbaXopuKFMHh2CyWZO.cs", "contains": "protected override char Prefix => 'M';" }
+			]
+		},
+		{
+			"id": "credential-format",
+			"description": "Builds each credential as a one-letter prefix followed by MD5(\"NekoV#\" + source).",
+			"evidence": [
+				{ "file": "DailyRoutines/RhLiA9HmWQpKXb1kRj0/NrbnhiHCEsR8sr7qVwf.cs", "contains": "protected const string SALT = \"NekoV#\";" },
+				{ "file": "DailyRoutines/RhLiA9HmWQpKXb1kRj0/NrbnhiHCEsR8sr7qVwf.cs", "contains": "MD5.HashData(new ASCIIEncoding().GetBytes(salt + input))" },
+				{ "file": "DailyRoutines/RhLiA9HmWQpKXb1kRj0/NrbnhiHCEsR8sr7qVwf.cs", "contains": "Token = $\"{Prefix}{text}\";" }
+			]
+		},
+		{
+			"id": "credential-a-account-id",
+			"description": "Credential A is derived from the user's own Account ID, read without naming the game structure: it calls the game's account-record getter, found by the signature 48 8B 05 ?? ?? ?? ?? C3 CC … 83 39, and reads 8 bytes at offset 8 of the result.",
+			"evidence": [
+				{ "file": "DailyRoutines/aaHXHJpWGFZcVPQIuT/OmmTcarfcxeESGwCpo.cs", "contains": "protected override char Prefix => 'A';" },
+				{ "file": "DailyRoutines/aaHXHJpWGFZcVPQIuT/OmmTcarfcxeESGwCpo.cs", "contains": "return LocalPlayerState.AccountID.ToString();" },
+				{ "file": "OmenTools/OmenTools.OmenService/LocalPlayerState.cs", "contains": "public unsafe static ulong AccountID => *(ulong*)(GetAccountInfoInstance() + 8);" },
+				{ "file": "OmenTools/OmenTools.OmenService/LocalPlayerState.cs", "contains": "new CompSig(\"48 8B 05 ?? ?? ?? ?? C3 CC CC CC CC CC CC CC CC 83 39\").GetDelegate<GetAccountInfoInstanceDelegate>()" }
+			]
+		},
+		{
+			"id": "credential-m-hardware",
+			"description": "Credential M is derived from hardware identifiers read through WMI and the registry, including the TPM endorsement key, the system product UUID, board, chassis and BIOS serial numbers and the Windows MachineGuid.",
+			"evidence": [
+				{ "file": "DailyRoutines/WsJtBbyqvXUPhKaeSa/NbaXopuKFMHh2CyWZO.cs", "contains": "protected override char Prefix => 'M';" },
+				{ "file": "DailyRoutines/WsJtBbyqvXUPhKaeSa/NbaXopuKFMHh2CyWZO.cs", "contains": "list.Add((\"TPMEK\", " },
+				{ "file": "DailyRoutines/WsJtBbyqvXUPhKaeSa/NbaXopuKFMHh2CyWZO.cs", "contains": "list.Add((\"CSProductUUID\", fJkaKw7h8(\"Win32_ComputerSystemProduct\", \"UUID\")));" },
+				{ "file": "DailyRoutines/WsJtBbyqvXUPhKaeSa/NbaXopuKFMHh2CyWZO.cs", "contains": "list.Add((\"BaseBoardSN\", fJkaKw7h8(\"Win32_BaseBoard\", \"SerialNumber\")));" },
+				{ "file": "DailyRoutines/WsJtBbyqvXUPhKaeSa/NbaXopuKFMHh2CyWZO.cs", "contains": "list.Add((\"ChassisSN\", fJkaKw7h8(\"Win32_SystemEnclosure\", \"SerialNumber\")));" },
+				{ "file": "DailyRoutines/WsJtBbyqvXUPhKaeSa/NbaXopuKFMHh2CyWZO.cs", "contains": "list.Add((\"BiosSN\", fJkaKw7h8(\"Win32_BIOS\", \"SerialNumber\")));" },
+				{ "file": "DailyRoutines/WsJtBbyqvXUPhKaeSa/NbaXopuKFMHh2CyWZO.cs", "contains": "list.Add((\"MachineGuid\", " }
+			]
+		},
+		{
+			"id": "credential-t-native",
+			"description": "Credential T comes from a native DLL embedded in the plugin as compressed base64, written to the temporary folder as \"tattoo.get\", loaded, and called through its get_machine_id export.",
+			"evidence": [
+				{ "file": "DailyRoutines/k0NqSoNnZUug2NOdAJ/FwbWhvn3sbPVtAKUm2.cs", "contains": "protected override char Prefix => 'T';" },
+				{ "file": "DailyRoutines/k0NqSoNnZUug2NOdAJ/FwbWhvn3sbPVtAKUm2.cs", "contains": "private const string DLL_GZ_B64 = \"H4sIAAAAAAAEAO" },
+				{ "file": "DailyRoutines/k0NqSoNnZUug2NOdAJ/FwbWhvn3sbPVtAKUm2.cs", "contains": "string text = Path.Combine(Path.GetTempPath(), \"tattoo.get\");" },
+				{ "file": "DailyRoutines/k0NqSoNnZUug2NOdAJ/FwbWhvn3sbPVtAKUm2.cs", "contains": "File.WriteAllBytes(text, bsRRsvor9(Convert.FromBase64String(" },
+				{ "file": "DailyRoutines/k0NqSoNnZUug2NOdAJ/FwbWhvn3sbPVtAKUm2.cs", "contains": "num = NativeLibrary.Load(text);" },
+				{ "file": "DailyRoutines/k0NqSoNnZUug2NOdAJ/FwbWhvn3sbPVtAKUm2.cs", "contains": "NativeLibrary.GetExport(num, \"get_machine_id\")" }
+			]
+		},
+		{
+			"id": "credential-character-link",
+			"description": "Sends each credential together with the logged-in character's Content ID to http://192.140.166.30:3999/api/upload_credential_cid.",
+			"evidence": [
+				{ "file": "DailyRoutines/JD8KtglE9fA1f4MHBnH/mu6ac2lFjNtOD19vPQ4.cs", "contains": "[InternalAPIRequestType.ReportCredentialCID] = (\"http://192.140.166.30:3999/api/upload_credential_cid\", APISourceType.CindyMaster)" },
+				{ "file": "DailyRoutines/RhLiA9HmWQpKXb1kRj0/NrbnhiHCEsR8sr7qVwf.cs", "contains": "ulong contentID = LocalPlayerState.ContentID;" },
+				{ "file": "DailyRoutines/RhLiA9HmWQpKXb1kRj0/NrbnhiHCEsR8sr7qVwf.cs", "contains": "await fxCkt6Hz1JcfW7XdRkW.Ym3lM3neLW<ruY7I0HD8AMS0KlHAYB>().a7qHZNuOfP(Token, contentID);" },
+				{ "file": "DailyRoutines/kpp3VuHM6IFtfy8O93p/ruY7I0HD8AMS0KlHAYB.cs", "contains": "await mu6ac2lFjNtOD19vPQ4.PostAsync(InternalAPIRequestType.ReportCredentialCID, new" },
+				{ "file": "DailyRoutines/kpp3VuHM6IFtfy8O93p/ruY7I0HD8AMS0KlHAYB.cs", "contains": "p_credential = credential," },
+				{ "file": "DailyRoutines/kpp3VuHM6IFtfy8O93p/ruY7I0HD8AMS0KlHAYB.cs", "contains": "p_contentid = contentID.ToString()" }
+			]
+		},
+		{
+			"id": "player-lookup",
+			"description": "Can request a Content ID's current name and world, and its rename history, from 192.140.166.30:3999.",
+			"evidence": [
+				{ "file": "DailyRoutines/JD8KtglE9fA1f4MHBnH/mu6ac2lFjNtOD19vPQ4.cs", "contains": "[InternalAPIRequestType.RequestPlayerInfoByCID] = (\"http://192.140.166.30:3999/api/get_player_info_cid\", APISourceType.CindyMaster)" },
+				{ "file": "DailyRoutines/JD8KtglE9fA1f4MHBnH/mu6ac2lFjNtOD19vPQ4.cs", "contains": "[InternalAPIRequestType.RequestUsedNames] = (\"http://192.140.166.30:3999/api/get_player_name_history\", APISourceType.CindyMaster)" },
+				{ "file": "DailyRoutines/DailyRoutines.RemoteInteraction.PlayerInfo.Handlers/PlayerInfoQueryHandler.cs", "contains": "mu6ac2lFjNtOD19vPQ4.OTnlNHwTFR(InternalAPIRequestType.RequestPlayerInfoByCID, new" },
+				{ "file": "DailyRoutines/DailyRoutines.RemoteInteraction.UsedNames.Handlers/UsedNamesQueryHandler.cs", "contains": "mu6ac2lFjNtOD19vPQ4.OTnlNHwTFR(InternalAPIRequestType.RequestUsedNames" }
+			]
+		},
+		{
+			"id": "licence-server",
+			"description": "Contacts a licence server over plain HTTP at http://auth.n4ko.com/ on the path api/v1/query, and sends it the hash of each credential, A included, with the credential's type.",
+			"evidence": [
+				{ "file": "DailyRoutines/Koa15ETXyuX1nT609H/Om5WLJcuF7bVZB4WPL.cs", "contains": "httpClient.BaseAddress = new Uri(\"http://auth.n4ko.com/\");" },
+				{ "file": "DailyRoutines/Koa15ETXyuX1nT609H/Om5WLJcuF7bVZB4WPL.cs", "contains": "IDHash = credential," },
+				{ "file": "DailyRoutines/Koa15ETXyuX1nT609H/Om5WLJcuF7bVZB4WPL.cs", "contains": "await httpClient.PostAsync(\"api/v1/query\", httpContent);" },
+				{ "file": "DailyRoutines/RhLiA9HmWQpKXb1kRj0/NrbnhiHCEsR8sr7qVwf.cs", "contains": "VX1HH4nyH3(znBH7DiH88(), V7DHphGeSX(Prefix), ExtraInfo)" },
+				{ "file": "DailyRoutines/RhLiA9HmWQpKXb1kRj0/NrbnhiHCEsR8sr7qVwf.cs", "contains": "return F78HVOxOxE(M2SUIwPRth(), \"NekoV#\");" }
+			]
+		},
+		{
+			"id": "others-account-id-check",
+			"description": "Reads other players' Account ID only to check that it is non-zero when building the list of players around the user; sightings do not include it.",
+			"evidence": [
+				{ "file": "DailyRoutines/DailyRoutines.Manager/PlayersManager.cs", "contains": "((BattleChara)value).ContentId != 0L && ((BattleChara)value).AccountId != 0L" }
+			]
+		}
+	]
+}

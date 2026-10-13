@@ -1,0 +1,124 @@
+{
+	"plugin": "Echo",
+	"version": "0.8.4",
+	"build": {
+		"Echo/0.8.4/latest.zip": "b4b0d4581dc642e30b53e72b0f617713e9acfbdbd7b64a93172cb6c353dac7c6",
+		"Echo/0.8.4/Echo.dll": "b44bad2ace0c944db945ecef315e2c3a3703bdd91ff8b25a1ce99896ed36ab1c",
+		"Echo/0.8.4/Echo.Core.dll": "197ad1fc38023631abfa7c21ef5452d70a567aa31e1ab310e250bf0221ab5805",
+		"Echo/0.8.4/Echo.Wire.dll": "10cba1a140db59791870de47f7ff494a583d0e0ac6717240d82c616b911b1aea"
+	},
+	"reproduce": {
+		"command": "dotnet run --project PluginAudits.Cli -- decompile Echo/0.8.4",
+		"output": "decompiled/Echo/0.8.4"
+	},
+	"notes": "Evidence paths are relative to the output folder. The plugin is not obfuscated; plain decompilation is enough.",
+	"findings": [
+		{
+			"id": "ingest-server",
+			"description": "Uploads batches of sightings to https://echovault.gg on /v1/ingest; each request is signed with an HMAC sent in X-Echo-* headers.",
+			"evidence": [
+				{ "file": "Echo/Echo/Plugin.cs", "contains": "BaseAddress = new Uri(\"https://echovault.gg\")" },
+				{ "file": "Echo.Core/Echo.Core/EchoApiClient.cs", "contains": "SendSignedAsync(\"/v1/ingest\", batch, creds, creds.SessionToken, ct)" },
+				{ "file": "Echo.Core/Echo.Core/EchoApiClient.cs", "contains": "httpRequestMessage.Headers.Add(\"X-Echo-Signature\", HmacSigner.Sign(hmacSecret, canonical));" }
+			]
+		},
+		{
+			"id": "sighting-record",
+			"description": "Each sighting holds the player's Content ID, name, home and current world, territory and x/y/z position, job, level, Free Company tag, appearance data, Account ID, title, Grand Company, equipment and weapon models, mount, online status, duty and online state, with the time it was seen.",
+			"evidence": [
+				{ "file": "Echo.Wire/Echo.Wire/Sighting.cs", "contains": "public record Sighting(ulong ContentId, string Name, uint HomeWorldId, uint CurrentWorldId, ushort TerritoryId, float X, float Y, float Z, byte JobId, byte Level, string? FcTag, string? CustomizeBase64, DateTimeOffset SeenAtUtc" },
+				{ "file": "Echo.Wire/Echo.Wire/Sighting.cs", "contains": "ulong AccountId = 0uL, ushort TitleId = 0, byte GrandCompany = 0, List<EquipSlot>? Equipment = null, ulong MainhandModel = 0uL, ulong OffhandModel = 0uL" },
+				{ "file": "Echo.Wire/Echo.Wire/Sighting.cs", "contains": "ushort MountId = 0, ushort OnlineStatusId = 0, ushort DutyId = 0, bool? IsOnline = null" },
+				{ "file": "Echo.Core/Echo.Core/CaptureEngine.cs", "contains": "nowUtc, player.Source, player.AccountId, player.TitleId, player.GrandCompany, player.Equipment" }
+			]
+		},
+		{
+			"id": "account-id-players-around",
+			"description": "Fills each sighting of a player around the user with that player's Account ID, read from the game's character data.",
+			"evidence": [
+				{ "file": "Echo/Echo/ObjectTableSweeper.cs", "contains": "ulong contentId = chara->ContentId;" },
+				{ "file": "Echo/Echo/ObjectTableSweeper.cs", "contains": "source, chara->AccountId, chara->TitleId, chara->Battalion" }
+			]
+		},
+		{
+			"id": "account-id-social-lists",
+			"description": "Fills each sighting from the game's character lists with that player's Account ID, read from the list entry.",
+			"evidence": [
+				{ "file": "Echo/Echo/SocialCollector.cs", "contains": "\"social\", reference.AccountId" }
+			]
+		},
+		{
+			"id": "source-players-around",
+			"description": "Records the players around the user from the object table, with their position and the models and dyes of their equipment.",
+			"evidence": [
+				{ "file": "Echo/Echo/ObjectTableSweeper.cs", "contains": "float x = pc.Position.X;" },
+				{ "file": "Echo/Echo/ObjectTableSweeper.cs", "contains": "list.Add(new EquipSlot(reference.Id, reference.Variant, reference.Stain0, reference.Stain1));" },
+				{ "file": "Echo/Echo/ObjectTableSweeper.cs", "contains": "engine.Process(captured, localContentId, DateTimeOffset.UtcNow, reporter)" }
+			]
+		},
+		{
+			"id": "source-social-and-search",
+			"description": "Records players from the game's friend list, Free Company, linkshell and cross-world linkshell member lists, Novice Network member and mentor lists, and from Player Search results.",
+			"evidence": [
+				{ "file": "Echo/Echo/SocialCollector.cs", "contains": "InfoProxyId.FriendList" },
+				{ "file": "Echo/Echo/SocialCollector.cs", "contains": "InfoProxyId.FreeCompanyMember" },
+				{ "file": "Echo/Echo/SocialCollector.cs", "contains": "InfoProxyId.LinkshellMember" },
+				{ "file": "Echo/Echo/SocialCollector.cs", "contains": "InfoProxyId.CrossWorldLinkshellMember" },
+				{ "file": "Echo/Echo/SocialCollector.cs", "contains": "InfoProxyId.NoviceNetworkMember" },
+				{ "file": "Echo/Echo/SocialCollector.cs", "contains": "InfoProxyId.NoviceNetworkMentor" },
+				{ "file": "Echo/Echo/SocialCollector.cs", "contains": "InfoProxyId.PlayerSearch" },
+				{ "file": "Echo/Echo/SocialCollector.cs", "contains": "socialEngine.Process(list, localContentId, utcNow2, reporter)" },
+				{ "file": "Echo/Echo/SocialCollector.cs", "contains": "searchEngine.Process(list2, localContentId, utcNow2, reporter)" }
+			]
+		},
+		{
+			"id": "source-party-finder-and-right-click",
+			"description": "Records the players behind Party Finder listings and any player the user right-clicks.",
+			"evidence": [
+				{ "file": "Echo/Echo/NameCacheCollector.cs", "contains": "private void OnListing(IPartyFinderListing listing, IPartyFinderListingEventArgs args)" },
+				{ "file": "Echo/Echo/NameCacheCollector.cs", "contains": "_queue.Enqueue(new CapturedPlayer(listing.ContentId, listing.Name.TextValue" },
+				{ "file": "Echo/Echo/NameCacheCollector.cs", "contains": "private void OnMenuOpened(IMenuOpenedArgs args)" },
+				{ "file": "Echo/Echo/NameCacheCollector.cs", "contains": "_queue.Enqueue(new CapturedPlayer(menuTargetDefault.TargetContentId, menuTargetDefault.TargetName" }
+			]
+		},
+		{
+			"id": "reporter-position",
+			"description": "Each batch also carries the user's own territory and x/y/z position.",
+			"evidence": [
+				{ "file": "Echo.Wire/Echo.Wire/ReporterSelf.cs", "contains": "public record ReporterSelf(ushort TerritoryId, float X, float Y, float Z);" },
+				{ "file": "Echo.Wire/Echo.Wire/IngestBatch.cs", "contains": "public record IngestBatch(int ProtocolVersion, string PluginVersion, ReporterSelf Reporter, List<Sighting> Sightings, bool AutoSearchEnabled = false);" }
+			]
+		},
+		{
+			"id": "capture-defaults",
+			"description": "Capturing players around the user, character lists, Party Finder and right-clicked players, and Player Search results is on by default; automatic Player Search is off by default.",
+			"evidence": [
+				{ "file": "Echo.Core/Echo.Core/PersistedSettings.cs", "contains": "public sealed record PersistedSettings(bool CaptureEnabled = true, bool SocialCaptureEnabled = true, bool NameCacheCaptureEnabled = true, bool SearchCaptureEnabled = true, bool ContextMenuLinkEnabled = true, bool AutoSearchEnabled = false" }
+			]
+		},
+		{
+			"id": "auto-search",
+			"description": "When automatic search is turned on, runs the game's Player Search by itself; its results are captured like other Player Search results.",
+			"evidence": [
+				{ "file": "Echo/Echo/SearchSweeper.cs", "contains": "!pluginStateSnapshot.AutoSearchEnabled" },
+				{ "file": "Echo/Echo/PlayerSearchRequest.cs", "contains": "InfoProxySearch* infoProxyById = (InfoProxySearch*)ptr->GetInfoProxyById(InfoProxyId.PlayerSearch);" }
+			]
+		},
+		{
+			"id": "scan-targets",
+			"description": "Requests from the server, for the user's world, a list of territories with counts of new players and sightings over 7 days and the hours since each was last swept.",
+			"evidence": [
+				{ "file": "Echo.Core/Echo.Core/EchoApiClient.cs", "contains": "SendSignedAsync(\"/v1/scan-targets\", new ScanTargetsRequest(2, worldId, 1), storedCredentials, null, ct)" },
+				{ "file": "Echo.Wire/Echo.Wire/ScanTarget.cs", "contains": "public record ScanTarget(int TerritoryId, int NewPlayers7d, int? LastSweptHoursAgo, int Sightings7d);" }
+			]
+		},
+		{
+			"id": "public-profiles",
+			"description": "Links players to public profile pages at https://echovault.gg/p/<world>/<name>, offered as \"View on EchoVault\" in the right-click menu.",
+			"evidence": [
+				{ "file": "Echo.Core/Echo.Core/ProfileLink.cs", "contains": "/p/{worldId}/{Uri.EscapeDataString(name.ToLowerInvariant().Replace(' ', '_'))}" },
+				{ "file": "Echo/Echo/NameCacheCollector.cs", "contains": "Name = \"View on EchoVault\"" }
+			]
+		}
+	]
+}

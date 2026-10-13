@@ -1,0 +1,121 @@
+{
+	"plugin": "PFRadar",
+	"version": "1.5.0.7",
+	"build": {
+		"PFRadar/1.5.0.7/latest.zip": "fe4746d714cdba57d62071155921b9f13bd119f7848270cf4af28f67c64e3562",
+		"PFRadar/1.5.0.7/PFRadar.dll": "00d97a727adc25a1c5f22905f1b3f955c6486c1054d8dc0e062ef77bbed9dd89"
+	},
+	"reproduce": {
+		"command": "dotnet run --project PluginAudits.PFRadar -c Release -- plugins/PFRadar/1.5.0.7/latest.zip -o decrypted/PFRadar/1.5.0.7",
+		"output": "decrypted/PFRadar/1.5.0.7"
+	},
+	"notes": "Evidence paths are relative to the output folder. proxies.json maps each obfuscated proxy call (Type.ScanRole(..., Type.Field)) to the method it really calls.",
+	"findings": [
+		{
+			"id": "server-endpoints",
+			"description": "Configures two server endpoints in code: 49.235.185.254 port 53188 and milalla.xuolu.com port 56188.",
+			"evidence": [
+				{ "file": "PFRadar/PFRadar.DataProcessing/InternalFilter.cs", "member": "InternalFilter.RefineStaticOrder", "contains": "new UserWatcher(\"49.235.185.254\", 53188)" },
+				{ "file": "PFRadar/PFRadar.DataProcessing/InternalFilter.cs", "member": "InternalFilter.RefineStaticOrder", "contains": "new UserWatcher(\"milalla.xuolu.com\", 56188)" },
+				{ "file": "PFRadar/PFRadar.DataProcessing/InternalFilter.cs", "contains": "internal required UserWatcher InstantiateInterpreter" },
+				{ "file": "PFRadar/PFRadar.DataProcessing/InternalFilter.cs", "contains": "internal UserWatcher? ChangeObject" }
+			]
+		},
+		{
+			"id": "tcp-connection",
+			"description": "Connects to one of these endpoints with a TcpClient and uses the connection's stream directly, without TLS.",
+			"evidence": [
+				{ "file": "PFRadar/Microsoft.ErrorHandling/FactoryVisitor.cs", "contains": "_CheckerList = ((isAllocatorChooser && VerifierWatcherLogger.ScanRole(VerifierEmitterResolver.ScanRole(factoryVisitor.passiveEvaluator, VerifierEmitterResolver.ValidateCustomProject)" },
+				{ "file": "proxies.json", "contains": "\"VerifierEmitterResolver.ValidateCustomProject\": \"PFRadar.DataProcessing.InternalFilter::FilterActiveProfile\"" },
+				{ "file": "proxies.json", "contains": "\"VerifierResolverManager.QueryEnumerator\": \"PFRadar.DataProcessing.InternalFilter::ClearSimpleParser\"" },
+				{ "file": "PFRadar/Microsoft.ErrorHandling/FactoryVisitor.cs", "contains": "VerifierCompressorStub.ScanRole(factoryVisitor, ConfigurablePoolVerifier.ScanRole(_CheckerList, ConfigurablePoolVerifier.EncodePolicy), VerifierManagerPool.ScanRole(_CheckerList, VerifierManagerPool.CheckScalableListener)" },
+				{ "file": "proxies.json", "contains": "\"ConfigurablePoolVerifier.EncodePolicy\": \"Microsoft.UserManagement.UserWatcher::PushConsumer\"" },
+				{ "file": "proxies.json", "contains": "\"VerifierManagerPool.CheckScalableListener\": \"Microsoft.UserManagement.UserWatcher::StopBuilder\"" },
+				{ "file": "proxies.json", "contains": "\"VerifierCompressorStub.VerifyActiveLocator\": \"Microsoft.ErrorHandling.FactoryVisitor::HandleGlobalWrapper\"" },
+				{ "file": "PFRadar/Microsoft.ErrorHandling/FactoryVisitor.cs", "contains": "private Task HandleGlobalWrapper(string res, int offsetresult, CancellationToken comp)" },
+				{ "file": "PFRadar/Microsoft.ErrorHandling/FactoryVisitor.cs", "contains": "stateMachine.m_ErrorContainerMsg = res;" },
+				{ "file": "PFRadar/Microsoft.ErrorHandling/FactoryVisitor.cs", "contains": "DetailedLoggerVerifier.ScanRole(factoryVisitor.viewerEncryptor, m_ErrorContainerMsg, _ErrorWorkerFlag, _ErrorProvider, DetailedLoggerVerifier.ConvertSharer)" },
+				{ "file": "proxies.json", "contains": "\"DetailedLoggerVerifier.ConvertSharer\": \"Microsoft.UserManagement.UserGenerator::AuthenticateConcreteAdapter\"" },
+				{ "file": "PFRadar/Microsoft.UserManagement/UserGenerator.cs", "contains": "internal Task AuthenticateConcreteAdapter(string def, int pred_X, CancellationToken dir)" },
+				{ "file": "PFRadar/Microsoft.UserManagement/UserGenerator.cs", "contains": "stateMachine.m_ConfigTokenTxt = def;" },
+				{ "file": "PFRadar/Microsoft.UserManagement/UserGenerator.cs", "contains": "m_FormatterSystem = new TcpClient();" },
+				{ "file": "PFRadar/Microsoft.UserManagement/UserGenerator.cs", "contains": "m_FormatterSystem.ConnectAsync(m_ConfigTokenTxt, scheduledListenerId, customRecord)" },
+				{ "file": "PFRadar/Microsoft.UserManagement/UserGenerator.cs", "contains": "userGenerator.centralUser = m_FormatterSystem.GetStream();" },
+				{ "files": "PFRadar/Microsoft.UserManagement/UserGenerator.cs", "absent": "SslStream" }
+			]
+		},
+		{
+			"id": "player-record",
+			"description": "Builds a record per player with the character's Content ID, name and home world, serialised as JSON keys \"a\", \"c\" and \"d\", plus a source code in key \"f\".",
+			"evidence": [
+				{ "file": "PFRadar/Microsoft.Proxies/ProxySolver.cs", "contains": "[\"a\"] = userSynchronizerIndex" },
+				{ "file": "PFRadar/Microsoft.Proxies/ProxySolver.cs", "contains": "[\"c\"] = (string?)m_AccessibleProxyNote" },
+				{ "file": "PFRadar/Microsoft.Proxies/ProxySolver.cs", "contains": "[\"d\"] = m_ResponsiveProxyAge" },
+				{ "file": "PFRadar/Microsoft.Proxies/ProxySolver.cs", "contains": "[\"f\"] = _IdentifiableEmitterScore" },
+				{ "file": "PFRadar/Microsoft.Logging/AttachedLogger.cs", "contains": "userSynchronizerIndex = value->ContentId" },
+				{ "file": "PFRadar/Microsoft.Logging/AttachedLogger.cs", "contains": "m_AccessibleProxyNote = value->NameString" },
+				{ "file": "PFRadar/Microsoft.Logging/AttachedLogger.cs", "contains": "m_ResponsiveProxyAge = value->HomeWorld" }
+			]
+		},
+		{
+			"id": "source-object-table",
+			"description": "Creates player records for the characters in the game's object table (players around the user), on every framework update, with source code 3.",
+			"evidence": [
+				{ "file": "PFRadar/Microsoft.Logging/AttachedLogger.cs", "contains": "private unsafe void LogSequentialSpec(IFramework key)" },
+				{ "file": "PFRadar/Microsoft.Logging/AttachedLogger.cs", "contains": "GameObjectManager.Instance()->Objects.IndexSorted" },
+				{ "file": "PFRadar/Microsoft.Logging/AttachedLogger.cs", "contains": "_IdentifiableEmitterScore = 3" }
+			]
+		},
+		{
+			"id": "source-party-finder",
+			"description": "Creates player records for the players behind Party Finder listings, with source code 4.",
+			"evidence": [
+				{ "file": "PFRadar/Microsoft.Finalization/ScopeFinalizer.cs", "contains": "private void CompleteInternalWrapper(IPartyFinderListing ident, IPartyFinderListingEventArgs pol)" },
+				{ "file": "PFRadar/Microsoft.Finalization/ScopeFinalizer.cs", "contains": "userSynchronizerIndex = ident.ContentId" },
+				{ "file": "PFRadar/Microsoft.Finalization/ScopeFinalizer.cs", "contains": "_IdentifiableEmitterScore = 4" }
+			]
+		},
+		{
+			"id": "source-character-lists",
+			"description": "Creates player records from the game's character lists (InfoProxyCommonList entries), with source code 6.",
+			"evidence": [
+				{ "file": "PFRadar/Microsoft.Collections/ReadableStack.cs", "contains": "InfoProxyCommonList.CharacterData characterData" },
+				{ "file": "PFRadar/Microsoft.Collections/ReadableStack.cs", "contains": "userSynchronizerIndex = characterData.ContentId" },
+				{ "file": "PFRadar/Microsoft.Collections/ReadableStack.cs", "contains": "_IdentifiableEmitterScore = 6" }
+			]
+		},
+		{
+			"id": "player-upload",
+			"description": "Sends player records in batches: a batch is wrapped as JSON {\"a\": [...]} in message 12351, serialised as UTF-8 and passed to the TCP client's send method, which writes it to the connection stream.",
+			"evidence": [
+				{ "file": "PFRadar/Microsoft.UserManagement/UserMember.cs", "contains": "VerifierPredicateProvider.ScanRole(userMember.m_RoleError, _TrackerBufferArray, _TrackerClient, VerifierPredicateProvider.InitAnnotation)" },
+				{ "file": "proxies.json", "contains": "\"VerifierPredicateProvider.InitAnnotation\": \"PFRadar.DataProcessing.SegmentedFilter::AssembleAuditor\"" },
+				{ "file": "PFRadar/PFRadar.DataProcessing/SegmentedFilter.cs", "contains": "internal Task<bool> AssembleAuditor(ProxySolver[] var1, CancellationToken cont)" },
+				{ "file": "PFRadar/PFRadar.DataProcessing/SegmentedFilter.cs", "contains": "QueueTracer stateMachine = default(QueueTracer);" },
+				{ "file": "PFRadar/PFRadar.DataProcessing/SegmentedFilter.cs", "contains": "segmentedFilter.ClearConnectedSpec(12351, cont, m_CollectorValidator)" },
+				{ "file": "PFRadar/PFRadar.Structures/AutomatableRecord.cs", "contains": "recordSetElements = (ProxySolver[])_RecordSetElements;" },
+				{ "file": "PFRadar/PFRadar.Structures/AutomatableRecord.cs", "contains": "jObject = new JObject { [\"a\"] = jArray };" },
+				{ "file": "PFRadar/PFRadar.DataProcessing/SegmentedFilter.cs", "contains": "scheduledDistributorNote = Encoding.UTF8.GetString(gatewayUser.ExploreSimpleResolver());" },
+				{ "file": "PFRadar/PFRadar.DataProcessing/SegmentedFilter.cs", "contains": "TransferableProfileVerifier.ScanRole(segmentedFilter.finderNotifier, array, _ControllerBuffer, TransferableProfileVerifier.StartMatcher)" },
+				{ "file": "proxies.json", "contains": "\"TransferableProfileVerifier.StartMatcher\": \"Microsoft.UserManagement.UserGenerator::AuthenticateInternalNode\"" },
+				{ "file": "PFRadar/Microsoft.UserManagement/UserGenerator.cs", "contains": "internal Task AuthenticateInternalNode(ReadOnlyMemory<byte> setup, CancellationToken ivk)" },
+				{ "file": "PFRadar/Microsoft.UserManagement/UserGenerator.cs", "contains": "userGenerator.centralUser.WriteAsync(" },
+				{ "file": "PFRadar/Microsoft.UserManagement/UserMember.cs", "contains": "Player upload success: " }
+			]
+		},
+		{
+			"id": "disclosure-text",
+			"description": "The plugin's own text says it only records the character names and home worlds of players encountered in public areas.",
+			"evidence": [
+				{ "file": "PFRadar/Microsoft.Processing/CentralCollector.cs", "contains": "What is collected? The plugin only records the character names and home worlds of players you encounter in public areas such as cities or open fields." }
+			]
+		},
+		{
+			"id": "no-account-id",
+			"description": "References no Account ID field.",
+			"evidence": [
+				{ "files": "PFRadar/**/*.cs", "absent": "AccountId" }
+			]
+		}
+	]
+}

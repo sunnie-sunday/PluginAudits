@@ -1,0 +1,81 @@
+{
+	"plugin": "NyaDraw",
+	"version": "1.14.0.35",
+	"build": {
+		"NyaDraw/1.14.0.35/latest.zip": "77c109b0a53d14c88b50cf78c839aa2d076af0f4a559cb5438304e3d909c5b6c",
+		"NyaDraw/1.14.0.35/NyaDraw.dll": "3d8edf4c915e8ddf0b72c714ea0aad1a71b9900564523af46521cc7dc80bad45"
+	},
+	"reproduce": {
+		"command": "dotnet run --project PluginAudits.DailyRoutines -c Release -- plugins/NyaDraw/1.14.0.35/latest.zip -o decrypted/NyaDraw/1.14.0.35",
+		"output": "decrypted/NyaDraw/1.14.0.35"
+	},
+	"notes": "Evidence paths are relative to the output folder. Hardcoded keys found in the plugin are deliberately not quoted. Finding IDs match those of later versions, so the same fact can be compared across builds.",
+	"findings": [
+		{
+			"id": "licence-server",
+			"description": "Contacts licence servers at https://auth.n4ko.com/ and https://auth.n3ko.fun/ on the path api/v1/query.",
+			"evidence": [
+				{ "file": "NyaDraw/SgP97MJV9c9ZoXIYjGw/ztwOe0J6dogsbdpTwdE.cs", "contains": "BaseAddress = new Uri(\"https://auth.n4ko.com/\")" },
+				{ "file": "NyaDraw/SgP97MJV9c9ZoXIYjGw/ztwOe0J6dogsbdpTwdE.cs", "contains": "BaseAddress = new Uri(\"https://auth.n3ko.fun/\")" },
+				{ "file": "NyaDraw/SgP97MJV9c9ZoXIYjGw/ztwOe0J6dogsbdpTwdE.cs", "contains": "await RpMJp4UMqu(\"api/v1/query\", text)" }
+			]
+		},
+		{
+			"id": "account-id-raw-read",
+			"description": "Reads the user's own Account ID without naming it: it calls the game's account-record getter, found by the signature 48 8B 05 ?? ?? ?? ?? C3 CC … 83 39, and reads 8 bytes at offset 8 of the result.",
+			"evidence": [
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "private static readonly string VsOYpEBuyW = \"48 8B 05 ?? ?? ?? ?? C3 CC CC CC CC CC CC CC CC 83 39\";" },
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "ulong num = *(ulong*)(Marshal.GetDelegateForFunctionPointer<DvtRymgNuoP408aO6Nd>(Svc.SigScanner.ScanText(VsOYpEBuyW))() + 8);" }
+			]
+		},
+		{
+			"id": "credential-format",
+			"description": "Turns identifiers into credentials as MD5(\"NekoV#\" + value).",
+			"evidence": [
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "internal static string XtrYVZUPgE = \"NekoV#\";" },
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "return NwjYNSnFqT(P_0, XtrYVZUPgE);" },
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "return ARNiqoYnqZOAUXtqYYs.p3SYlZKHDw(P_1 + P_0);" },
+				{ "file": "NyaDraw/OBqj7gYmbbZeOhvkhBj/ARNiqoYnqZOAUXtqYYs.cs", "contains": "internal static UInt128 p3SYlZKHDw(string P_0)" },
+				{ "file": "NyaDraw/OBqj7gYmbbZeOhvkhBj/ARNiqoYnqZOAUXtqYYs.cs", "contains": "MD5.HashData(YeeYCtCylY(P_0))" }
+			]
+		},
+		{
+			"id": "hardware-fingerprint",
+			"description": "Builds a hardware fingerprint from the motherboard serial number, the processor ID and fixed-disk serial numbers read through WMI, hashed with SHA-256.",
+			"evidence": [
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "(\"SELECT SerialNumber FROM Win32_BaseBoard\", \"SerialNumber\", true)" },
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "(\"SELECT ProcessorId FROM Win32_Processor\", \"ProcessorId\", true)" },
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "SELECT SerialNumber, Size, Model FROM Win32_DiskDrive" },
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "ManagementObjectSearcher managementObjectSearcher = new ManagementObjectSearcher(P_0);" },
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(stringBuilder.ToString())))" }
+			]
+		},
+		{
+			"id": "licence-checks",
+			"description": "Sends the hardware credential (type 2) and the Account ID credential (type 3) to the licence server, each with the plugin ID and the client language.",
+			"evidence": [
+				{ "file": "NyaDraw/Rf0mite7pbLBMW80uqV/CkNu5JejYS7hTXfINfO.cs", "contains": "jZee3HDsyv.ty9JoBOd92(xLbe8sAPdy, OPHYyDYWxZnW8dVM3LG.ctyYFJ8ALu(), 2)" },
+				{ "file": "NyaDraw/Rf0mite7pbLBMW80uqV/CkNu5JejYS7hTXfINfO.cs", "contains": "jZee3HDsyv.ty9JoBOd92(xLbe8sAPdy, OPHYyDYWxZnW8dVM3LG.ntuYXC16ue(), 3)" },
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "return Y39YSBt74h(BvLYT7vHm0());" },
+				{ "file": "NyaDraw/xUjIbAYLEITH0BT2QVV/OPHYyDYWxZnW8dVM3LG.cs", "contains": "return Y39YSBt74h(xPtYdNJu6L());" },
+				{ "file": "NyaDraw/SgP97MJV9c9ZoXIYjGw/ztwOe0J6dogsbdpTwdE.cs", "contains": "McVYQfgq7H = P_0," },
+				{ "file": "NyaDraw/SgP97MJV9c9ZoXIYjGw/ztwOe0J6dogsbdpTwdE.cs", "contains": "PMVYGfdk73 = P_1," },
+				{ "file": "NyaDraw/SgP97MJV9c9ZoXIYjGw/ztwOe0J6dogsbdpTwdE.cs", "contains": "q6vYP1YR6j = P_2," },
+				{ "file": "NyaDraw/SgP97MJV9c9ZoXIYjGw/ztwOe0J6dogsbdpTwdE.cs", "contains": "TWyYyhWNwR = (ushort)Svc.ClientState.ClientLanguage" }
+			]
+		},
+		{
+			"id": "machine-code-token",
+			"description": "A \"machine code\" button copies to the clipboard an AES-encrypted token holding the character's name and home world, the Content ID and the raw Account ID.",
+			"evidence": [
+				{ "file": "NyaDraw/BqB4TvYjxAygPCNU4jY/H0sQlBYvrTqC57DhKAs.cs", "contains": "Player = obj + text + (string?)obj2," },
+				{ "file": "NyaDraw/BqB4TvYjxAygPCNU4jY/H0sQlBYvrTqC57DhKAs.cs", "contains": "CID = $\"{Svc.ClientState.LocalContentId}\"," },
+				{ "file": "NyaDraw/BqB4TvYjxAygPCNU4jY/H0sQlBYvrTqC57DhKAs.cs", "contains": "AID = OPHYyDYWxZnW8dVM3LG.xPtYdNJu6L()," },
+				{ "file": "NyaDraw/BqB4TvYjxAygPCNU4jY/H0sQlBYvrTqC57DhKAs.cs", "contains": "using Aes aes = Aes.Create();" },
+				{ "file": "NyaDraw/DboJo9rNXnWHHb7D0S/kvnFKdi1db3qR8I8YM.cs", "contains": "\"NekoVerify-MachineCode\".Loc()" },
+				{ "file": "NyaDraw/DboJo9rNXnWHHb7D0S/kvnFKdi1db3qR8I8YM.cs", "contains": "H0sQlBYvrTqC57DhKAs.viIY7xb7Bp(CkNu5JejYS7hTXfINfO.mjBeR4KNfW())" },
+				{ "file": "NyaDraw/DboJo9rNXnWHHb7D0S/kvnFKdi1db3qR8I8YM.cs", "contains": "ImGui.SetClipboardText(clipboardText);" }
+			]
+		}
+	]
+}

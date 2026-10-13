@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Shared settings (net8.0, RollForward, Nullable, ...) come from Directory.Build.props. -->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<AssemblyName>drdecrypt</AssemblyName>
+		<RootNamespace>PluginAudits.DailyRoutines</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="../PluginAudits.Core/PluginAudits.Core.csproj" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+	</ItemGroup>
+
+</Project>

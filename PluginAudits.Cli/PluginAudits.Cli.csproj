@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Shared settings (net8.0, RollForward, Nullable, ...) come from Directory.Build.props. -->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<AssemblyName>pluginaudits</AssemblyName>
+		<RootNamespace>PluginAudits.Cli</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Decompilation, the "target never loaded" check and Reactor detection, shared with the other tools. -->
+		<ProjectReference Include="../PluginAudits.Core/PluginAudits.Core.csproj" />
+	</ItemGroup>
+
+</Project>

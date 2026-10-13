@@ -1,0 +1,6 @@
+<Solution>
+	<Project Path="PluginAudits.DailyRoutines/PluginAudits.DailyRoutines.csproj" />
+	<Project Path="PluginAudits.PFRadar/PluginAudits.PFRadar.csproj" />
+	<Project Path="PluginAudits.Cli/PluginAudits.Cli.csproj" />
+	<Project Path="PluginAudits.Core/PluginAudits.Core.csproj" />
+</Solution>

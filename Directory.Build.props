@@ -1,0 +1,12 @@
+<Project>
+	<!-- Shared settings for all projects. -->
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<RollForward>Major</RollForward>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<LangVersion>latest</LangVersion>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+	</PropertyGroup>
+</Project>

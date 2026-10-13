@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Shared settings (net8.0, RollForward, Nullable, ...) come from Directory.Build.props. -->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<AssemblyName>pfrdecrypt</AssemblyName>
+		<RootNamespace>PluginAudits.PFRadar</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Decompilation and the "target never loaded" check, shared with the other tools. -->
+		<ProjectReference Include="../PluginAudits.Core/PluginAudits.Core.csproj" />
+		<!-- IL reading and writing for the emulator and the method restorer. -->
+		<PackageReference Include="dnlib" Version="4.1.0" />
+	</ItemGroup>
+
+</Project>

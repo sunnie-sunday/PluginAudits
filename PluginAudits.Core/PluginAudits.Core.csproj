@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Code shared by the audit tools (pluginaudits, drdecrypt, pfrdecrypt): static decompilation, the
+	     "target never loaded" check and .NET Reactor detection. Shared settings come from Directory.Build.props. -->
+	<PropertyGroup>
+		<OutputType>Library</OutputType>
+		<RootNamespace>PluginAudits.Core</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- The ILSpy engine, pinned so every tool decompiles identically. -->
+		<PackageReference Include="ICSharpCode.Decompiler" Version="9.1.0.7988" />
+	</ItemGroup>
+
+</Project>

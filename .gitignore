@@ -1,0 +1,12 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+
+plugins/*
+!plugins/SHA256SUMS
+!plugins/README.md
+
+decompiled/
+decrypted/
