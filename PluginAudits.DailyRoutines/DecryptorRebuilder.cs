@@ -172,13 +172,12 @@ internal static class DecryptorRebuilder
 			root = ((CompilationUnitSyntax)tree.GetRoot()).RemoveNodes(doomed, SyntaxRemoveOptions.KeepNoTrivia)!;
 		}
 
-		root = HoistLocals(root, info, Compile(root));
+		root = HoistLocals(info, Compile(root));
 		compilation = Compile(root);
 		return compilation.SyntaxTrees[0];
 	}
 
-	private static CompilationUnitSyntax HoistLocals(
-		CompilationUnitSyntax root, DecryptorInfo info, CSharpCompilation compilation)
+	private static CompilationUnitSyntax HoistLocals(DecryptorInfo info, CSharpCompilation compilation)
 	{
 		var tree = compilation.SyntaxTrees[0];
 		var model = compilation.GetSemanticModel(tree);

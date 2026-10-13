@@ -117,12 +117,8 @@ internal sealed class IlEmulator(ModuleDefMD module)
 	public MethodDef? StartMethod { get; set; }
 	private bool _jumped;
 	public long Steps { get; private set; }
-	public long MaxSteps { get; set; } = 400_000_000;
-	public int MaxDepth { get; set; } = 24;
-	/// <summary>Called for every frame's locals when a stop happens (for snapshotting arrays).</summary>
-	public List<(MethodDef Method, object?[] Locals)> Frames { get; } = new();
-	/// <summary>Optional hook to intercept calls before default handling. Return true if handled.</summary>
-	public Func<IMethod, object?[], (bool handled, object? result)>? CallHook { get; set; }
+	private const long MaxSteps = 400_000_000;
+	private const int MaxDepth = 24;
 
 	public object? Run(MethodDef method, object?[] args, int depth = 0)
 	{
@@ -146,8 +142,6 @@ internal sealed class IlEmulator(ModuleDefMD module)
 				? new ObjectInstance(std)
 				: DefaultFor(lt);
 		}
-		var frame = (method, locals);
-		Frames.Add(frame);
 		var stack = new Stack<object?>();
 		var pc = 0;
 		try
@@ -719,17 +713,8 @@ internal sealed class IlEmulator(ModuleDefMD module)
 		}
 		finally
 		{
-			Frames.Remove(frame);
 			LastFrames[method] = locals;
 		}
-	}
-
-	/// <summary>Last external/model calls (diagnostics).</summary>
-	public Queue<string> CallTrail { get; } = new();
-	private void Trail(string s)
-	{
-		CallTrail.Enqueue(s);
-		while (CallTrail.Count > 400) CallTrail.Dequeue();
 	}
 
 	/// <summary>Locals of the most recent completed or aborted frame per method.</summary>
@@ -737,12 +722,6 @@ internal sealed class IlEmulator(ModuleDefMD module)
 
 	private object? Invoke(IMethod m, object?[] args, bool isNew, int depth, MethodDef caller, Instruction at)
 	{
-		if (CallHook is not null)
-		{
-			var (handled, r) = CallHook(m, args);
-			if (handled) return r;
-		}
-
 		// Invoke on a proxy delegate: dispatch to the real target with the remaining arguments.
 		if (m.Name == "Invoke" && args.Length > 0 && args[0] is Marker { What: "delegate", Payload: IMethod target })
 			return Invoke(target, args[1..], false, depth, caller, at);
@@ -798,16 +777,9 @@ internal sealed class IlEmulator(ModuleDefMD module)
 		}
 
 		if (TryReflectionModel(m, args, depth, caller, at, out var reflected))
-		{
-			Trail($"{m.DeclaringType.Name}::{m.Name} -> {Describe(reflected)}");
 			return reflected;
-		}
 		if (ExternalModels.TryInvoke(m, args, isNew, out var res))
-		{
-			var shown = args.Skip(m.MethodSig.HasThis && !isNew ? 1 : 0).Select(a => Describe(Deref(a)));
-			Trail($"{m.DeclaringType.Name}::{m.Name}({string.Join(", ", shown)}) -> {Describe(res)}");
 			return res;
-		}
 		throw new StopException("unmodelled external call: " + m.FullName
 			+ (m.MethodSig.HasThis && args.Length > 0 ? $" [this={Describe(Deref(args[0]))}, via {at.OpCode}]" : ""),
 			caller, at);
@@ -854,50 +826,14 @@ internal sealed class IlEmulator(ModuleDefMD module)
 					}
 				case "get_IsVirtual" when payload is IMethod vm:
 					result = vm.ResolveMethodDef()?.IsVirtual == true ? 1 : 0; return true;
-				case "get_IsAbstract" when payload is IMethod am:
-					result = am.ResolveMethodDef()?.IsAbstract == true ? 1 : 0; return true;
-				case "get_IsFinal" when payload is IMethod fm:
-					result = fm.ResolveMethodDef()?.IsFinal == true ? 1 : 0; return true;
-				case "get_IsPublic" when payload is IMethod pubm:
-					result = pubm.ResolveMethodDef()?.IsPublic != false ? 1 : 0; return true;
-				case "get_IsPublic" when payload is IField pubf:
-					result = pubf.ResolveFieldDef()?.IsPublic != false ? 1 : 0; return true;
-				case "get_IsConstructor" when payload is IMethod cm:
-					result = cm.Name == ".ctor" || cm.Name == ".cctor" ? 1 : 0; return true;
-				case "get_IsGenericMethod" when payload is IMethod gm:
-					result = gm is MethodSpec || gm.MethodSig.GenParamCount > 0 ? 1 : 0; return true;
-				case "get_ContainsGenericParameters":
-					result = payload is IMethod { MethodSig.GenParamCount: > 0 } and not MethodSpec ? 1 : 0;
-					return true;
-				case "GetGenericArguments" when payload is MethodSpec ms:
-					result = ms.GenericInstMethodSig.GenericArguments.Select(a => (object?)TypeMarker(a)).ToArray();
-					return true;
-				case "GetGenericArguments": result = Array.Empty<object?>(); return true;
-				case "get_CallingConvention" when payload is IMethod ccm:
-					result = ccm.MethodSig.HasThis ? 0x21 : 0x01; return true;
-				case "get_Name" when payload is IMemberRef nm: result = nm.Name.String; return true;
-				case "get_ReflectedType":
-					result = TypeMarker((payload as IMemberRef)?.DeclaringType?.ToTypeSig()); return true;
-				case "get_IsLiteral" when payload is IField lf:
-					result = lf.ResolveFieldDef()?.IsLiteral == true ? 1 : 0; return true;
-				case "get_IsInitOnly" when payload is IField rf:
-					result = rf.ResolveFieldDef()?.IsInitOnly == true ? 1 : 0; return true;
 				case "get_IsStatic" when payload is IMethod sm:
 					result = sm.MethodSig.HasThis ? 0 : 1; return true;
-				case "get_IsStatic" when payload is IField sf:
-					result = sf.ResolveFieldDef()?.IsStatic == true ? 1 : 0; return true;
 				case "get_ReturnType" when payload is IMethod rm:
 					result = TypeMarker(rm.MethodSig.RetType); return true;
 				case "get_FieldType" when payload is IField ff:
 					result = TypeMarker(ff.FieldSig.Type); return true;
 				case "get_DeclaringType":
 					result = TypeMarker((payload as IMemberRef)?.DeclaringType?.ToTypeSig()); return true;
-				case "get_MemberType":
-					result = payload is IField ? 4
-						: payload is IMethod { Name.String: ".ctor" } ? 1
-						: payload is IMethod ? 8
-						: 32;
-					return true;
 				case "Invoke" when payload is IMethod { Name.String: ".ctor" } ctorM && args.Length == 2:
 					{
 						// ConstructorInfo.Invoke(object[]): construct via newobj semantics.
@@ -951,21 +887,8 @@ internal sealed class IlEmulator(ModuleDefMD module)
 			};
 			return true;
 		}
-		if (type == "System.Array" && name is "SetValue" or "GetValue" && Arg(0) is Array arr && args.Length >= 2)
+		if (type == "System.Array" && name == "SetValue" && Arg(0) is Array arr && args.Length >= 3)
 		{
-			if (name == "GetValue")
-			{
-				var gi = ToInt(Arg(1));
-				result = arr switch
-				{
-					byte[] b => (int)b[gi],
-					int[] ia => ia[gi],
-					long[] la => la[gi],
-					object?[] oa => oa[gi],
-					_ => arr.GetValue(gi),
-				};
-				return true;
-			}
 			var value = Arg(1); var si = ToInt(Arg(2));
 			switch (arr)
 			{
@@ -993,28 +916,12 @@ internal sealed class IlEmulator(ModuleDefMD module)
 					: null;
 			return true;
 		}
-		// Exception base constructors on emulator objects: no-ops (the VM builds exceptions as plain objects).
-		if (type is "System.Exception" or "System.SystemException" or "System.ApplicationException" && name == ".ctor"
-			&& Arg(0) is ObjectInstance)
-		{
-			result = null; return true;
-		}
-		if (type == "System.Runtime.CompilerServices.RuntimeHelpers" && name == "GetObjectValue")
-		{
-			result = Arg(0); return true;
-		}
+		// Only BCL types are created this way (zero values); the target's own types stay unmodelled.
 		if (type == "System.Activator" && name == "CreateInstance"
-			&& Arg(0) is Marker { What: "Type", Payload: TypeSig actType })
+			&& Arg(0) is Marker { What: "Type", Payload: TypeSig actType }
+			&& actType.ToTypeDefOrRef()?.ResolveTypeDef()?.Module != module)
 		{
-			var td = actType.ToTypeDefOrRef()?.ResolveTypeDef();
-			if (td is not null && td.Module == module)
-			{
-				var inst = new ObjectInstance(td);
-				var ctor = td.FindDefaultConstructor();
-				if (ctor is { HasBody: true }) Run(ctor, [inst], depth + 1);
-				result = inst; return true;
-			}
-			result = DefaultFor(actType); return true; // primitives: zero value
+			result = DefaultFor(actType); return true;
 		}
 		if (type == "System.Array" && name == "CreateInstance"
 			&& Arg(0) is Marker { What: "Type", Payload: TypeSig arrElem })
@@ -1029,30 +936,6 @@ internal sealed class IlEmulator(ModuleDefMD module)
 			};
 			return true;
 		}
-		if (type == "System.Type" && name == "GetTypeCode" && Arg(0) is Marker { What: "Type", Payload: var gt })
-		{
-			var es = (gt as TypeSig)?.RemovePinnedAndModifiers();
-			if (es?.ToTypeDefOrRef()?.ResolveTypeDef() is { IsEnum: true } en) es = en.GetEnumUnderlyingType();
-			result = es?.ElementType switch
-			{
-				ElementType.Boolean => 3,
-				ElementType.Char => 4,
-				ElementType.I1 => 5,
-				ElementType.U1 => 6,
-				ElementType.I2 => 7,
-				ElementType.U2 => 8,
-				ElementType.I4 => 9,
-				ElementType.U4 => 10,
-				ElementType.I8 => 11,
-				ElementType.U8 => 12,
-				ElementType.R4 => 13,
-				ElementType.R8 => 14,
-				ElementType.String => 18,
-				null => 0,
-				_ => 1,
-			};
-			return true;
-		}
 		if (type == "System.Type" && name == "GetTypeFromHandle")
 		{
 			result = Arg(0) is Marker { Payload: ITypeDefOrRef td } ? TypeMarker(td.ToTypeSig()) : TypeMarker(null);
@@ -1061,63 +944,17 @@ internal sealed class IlEmulator(ModuleDefMD module)
 		if (Arg(0) is Marker { What: "Type" } tm
 			&& (type is "System.Type" or "System.Reflection.TypeInfo" or "System.Reflection.MemberInfo"))
 		{
-			var sig = tm.Payload as TypeSig;
-			var et = sig?.RemovePinnedAndModifiers();
+			var et = (tm.Payload as TypeSig)?.RemovePinnedAndModifiers();
 			switch (name)
 			{
 				case "get_IsByRef": result = et is ByRefSig ? 1 : 0; return true;
-				case "get_IsPointer": result = et is PtrSig ? 1 : 0; return true;
-				case "get_IsArray": result = et is SZArraySig or ArraySig ? 1 : 0; return true;
 				case "get_IsValueType": result = et?.IsValueType == true ? 1 : 0; return true;
-				case "get_IsPrimitive": result = et?.IsPrimitive == true ? 1 : 0; return true;
 				case "get_IsEnum":
 					result = (et?.ToTypeDefOrRef()?.ResolveTypeDef()?.IsEnum
 							  ?? (et is null ? null : ExternalModels.ResolveBclType(et)?.IsEnum)) == true ? 1 : 0;
 					return true;
-				case "GetEnumUnderlyingType":
-					{
-						var etd = et?.ToTypeDefOrRef()?.ResolveTypeDef();
-						if (etd is { IsEnum: true }) { result = TypeMarker(etd.GetEnumUnderlyingType()); return true; }
-						var clrEnum = et is null ? null : ExternalModels.ResolveBclType(et);
-						result = clrEnum is { IsEnum: true }
-							? TypeMarker(new Importer(module).ImportAsTypeSig(Enum.GetUnderlyingType(clrEnum)))
-							: null;
-						return true;
-					}
-				case "get_IsGenericParameter": result = et is GenericSig ? 1 : 0; return true;
 				case "GetElementType": result = et is NonLeafSig nl ? TypeMarker(nl.Next) : null; return true;
-				case "get_FullName": result = et?.FullName; return true;
-				case "get_Name": result = et?.TypeName; return true;
 				case "get_TypeHandle": result = tm; return true;
-				case "get_IsGenericType": result = et is GenericInstSig ? 1 : 0; return true;
-				case "GetGenericTypeDefinition":
-					result = et is GenericInstSig g0 ? TypeMarker(g0.GenericType) : tm; return true;
-				case "GetGenericArguments":
-					result = et is GenericInstSig g1
-						? g1.GenericArguments.Select(a => (object?)TypeMarker(a)).ToArray()
-						: Array.Empty<object?>();
-					return true;
-				case "get_IsInterface":
-					result = et?.ToTypeDefOrRef()?.ResolveTypeDef()?.IsInterface == true ? 1 : 0; return true;
-				case "get_IsClass":
-					result = et is not null && !et.IsValueType
-						&& et.ToTypeDefOrRef()?.ResolveTypeDef()?.IsInterface != true ? 1 : 0;
-					return true;
-				case "get_IsSealed":
-					result = et?.ToTypeDefOrRef()?.ResolveTypeDef()?.IsSealed == true ? 1 : 0; return true;
-				case "get_IsAbstract":
-					result = et?.ToTypeDefOrRef()?.ResolveTypeDef()?.IsAbstract == true ? 1 : 0; return true;
-				case "get_BaseType":
-					{
-						var bt = et?.ToTypeDefOrRef()?.ResolveTypeDef()?.BaseType;
-						result = bt is null ? null : TypeMarker(bt.ToTypeSig()); return true;
-					}
-				case "IsAssignableFrom" when Arg(1) is Marker { What: "Type" } other:
-					result = ReferenceEquals(tm, other) || IsSubclass(other.Payload as TypeSig, sig) ? 1 : 0;
-					return true;
-				case "IsSubclassOf" when Arg(1) is Marker { What: "Type" } other2:
-					result = !ReferenceEquals(tm, other2) && IsSubclass(sig, other2.Payload as TypeSig) ? 1 : 0;
-					return true;
 			}
 		}
 		if (type == "System.Nullable" && name == "GetUnderlyingType"
@@ -1128,17 +965,6 @@ internal sealed class IlEmulator(ModuleDefMD module)
 				? TypeMarker(gn.GenericArguments[0])
 				: null;
 			return true;
-		}
-		return false;
-	}
-
-	private static bool IsSubclass(TypeSig? derived, TypeSig? baseSig)
-	{
-		if (derived is null || baseSig is null) return false;
-		var want = baseSig.ToTypeDefOrRef()?.FullName;
-		for (var td = derived.ToTypeDefOrRef()?.ResolveTypeDef(); td is not null; td = td.BaseType?.ResolveTypeDef())
-		{
-			if (td.FullName == want || td.Interfaces.Any(i => i.Interface.FullName == want)) return true;
 		}
 		return false;
 	}

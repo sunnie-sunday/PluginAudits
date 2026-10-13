@@ -20,12 +20,6 @@ internal static class Program
               (see BuildProfile.cs) unless --force is given with --profile <version>.
           pfrdecrypt trace <input.dll> <method> <output-dir> [--start-state <n>] [--location <original.dll>]
               Statically emulates a loader method and dumps the byte arrays and constants it builds.
-          pfrdecrypt restore <input.dll> <methods-store> <output.dll>
-              Restores NecroBit-encrypted method bodies from a decrypted method store.
-          pfrdecrypt strings <decompiled.cs | project-dir> <string-blob.bin> <constants.json> -o <output>
-                             [--dump-table <strings.json>]
-              Replaces encrypted string-accessor calls with their literals, using the blob and constants
-              dumped by `trace`.
         """;
 
 	private static int Main(string[] args)
@@ -39,18 +33,6 @@ internal static class Program
 
 		switch (rest[0])
 		{
-			case "strings":
-				{
-					rest.RemoveAt(0);
-					var target = Take(rest, "-o");
-					var dump = Take(rest, "--dump-table");
-					if (target is null || rest.Count < 3) return Fail(Usage);
-					return StringRewriter.Run(rest[0], rest[1], rest[2], target, dump);
-				}
-			case "restore":
-				if (rest.Count < 4) return Fail(Usage);
-				return MethodRestorer.Restore(
-					Path.GetFullPath(rest[1]), Path.GetFullPath(rest[2]), Path.GetFullPath(rest[3]));
 			case "trace":
 				{
 					rest.RemoveAt(0);

@@ -18,36 +18,16 @@ internal static class ExternalModels
 	private static readonly HashSet<string> ForwardTypes =
 	[
 		"System.IO.BinaryReader", "System.IO.Stream", "System.IO.MemoryStream",
-		"System.Array", "System.Buffer", "System.BitConverter", "System.String", "System.Math",
-		"System.Text.Encoding", "System.Convert",
-		"System.Collections.Generic.List`1", "System.Collections.Generic.Dictionary`2",
-		"System.Security.Cryptography.SymmetricAlgorithm", "System.Security.Cryptography.Aes",
-		"System.Security.Cryptography.Rijndael", "System.Security.Cryptography.RijndaelManaged",
-		"System.Security.Cryptography.AesManaged", "System.Security.Cryptography.AesCryptoServiceProvider",
-		"System.Security.Cryptography.CryptoStream", "System.Security.Cryptography.ICryptoTransform",
-		"System.Security.Cryptography.DES", "System.Security.Cryptography.DESCryptoServiceProvider",
-		"System.Security.Cryptography.TripleDES", "System.Security.Cryptography.TripleDESCryptoServiceProvider",
-		"System.IDisposable", "System.Object", "System.Version", "System.Collections.Hashtable",
-        // In-memory asymmetric verification and hashing (no key containers: UseMachineKeyStore is a no-op model).
-        "System.Security.Cryptography.RSACryptoServiceProvider", "System.Security.Cryptography.RSA",
-		"System.Security.Cryptography.AsymmetricAlgorithm", "System.Security.Cryptography.HashAlgorithm",
-		"System.Security.Cryptography.SHA1", "System.Security.Cryptography.SHA1CryptoServiceProvider",
-		"System.Security.Cryptography.SHA1Managed", "System.Security.Cryptography.SHA256",
-		"System.Security.Cryptography.SHA256Managed", "System.Security.Cryptography.MD5",
-		"System.Security.Cryptography.MD5CryptoServiceProvider", "System.Security.Cryptography.RSAParameters",
-		"System.Security.Cryptography.CryptoConfig",
-		"System.Int32", "System.UInt32", "System.Int64", "System.UInt64", "System.Int16", "System.UInt16",
-		"System.Byte", "System.SByte", "System.Boolean", "System.Char", "System.Double", "System.Single",
-		"System.Decimal",
-		"System.Enum", "System.Nullable`1",
-		"System.Collections.Generic.Stack`1", "System.Collections.Generic.Queue`1",
-		"System.Collections.Generic.HashSet`1",
-		"System.Collections.Generic.KeyValuePair`2", "System.Collections.Generic.List`1/Enumerator",
-		"System.Collections.Generic.Dictionary`2/Enumerator", "System.Collections.IEnumerator",
-		"System.Collections.Generic.IEnumerator`1", "System.Collections.Generic.IEnumerable`1",
-		"System.Collections.Generic.ICollection`1", "System.Collections.Generic.IList`1",
-		"System.Collections.ICollection",
-		"System.Collections.IList", "System.Text.UnicodeEncoding", "System.Text.UTF8Encoding",
+		"System.Array", "System.BitConverter", "System.String", "System.Math", "System.Int32",
+		"System.Text.Encoding", "System.IDisposable",
+		"System.Collections.Generic.List`1", "System.Collections.Generic.List`1/Enumerator",
+		"System.Collections.Hashtable",
+		"System.Security.Cryptography.SymmetricAlgorithm", "System.Security.Cryptography.RijndaelManaged",
+		"System.Security.Cryptography.CryptoStream",
+		// In-memory asymmetric verification and hashing (no key containers: UseMachineKeyStore is a no-op model).
+		"System.Security.Cryptography.RSACryptoServiceProvider", "System.Security.Cryptography.AsymmetricAlgorithm",
+		"System.Security.Cryptography.HashAlgorithm", "System.Security.Cryptography.SHA1",
+		"System.Security.Cryptography.MD5CryptoServiceProvider", "System.Security.Cryptography.CryptoConfig",
 	];
 
 	public static bool TryInvoke(IMethod m, object?[] args, bool isNew, out object? result)
@@ -63,28 +43,17 @@ internal static class ExternalModels
 			case ("System.Reflection.IntrospectionExtensions", "GetTypeInfo"):
 				result = new IlEmulator.Marker("Type"); return true;
 			case ("System.Type", "get_Assembly"):
-			case ("System.Reflection.TypeInfo", "get_Assembly"):
-			case ("System.Reflection.Module", "get_Assembly"):
-			case ("System.Reflection.Assembly", "GetExecutingAssembly"):
-			case ("System.Reflection.Assembly", "GetCallingAssembly"):
 				result = new IlEmulator.Marker("Assembly"); return true;
 			case ("System.Type", "get_Module"):
-			case ("System.Reflection.MemberInfo", "get_Module"):
-			case ("System.Reflection.Assembly", "get_ManifestModule"):
 				result = new IlEmulator.Marker("Module"); return true;
 			case ("System.Reflection.Assembly", "GetManifestResourceStream")
 				when args.Length == 2 && args[1] is string res:
 				result = ResourceStream(res); return true;
 			// The target's own file: location is the ORIGINAL dll; reads are allowed for that exact path only.
 			case ("System.Reflection.Assembly", "get_Location"):
-			case ("System.Reflection.Assembly", "get_CodeBase"):
 				result = LocationPath ?? throw new InvalidOperationException("no --location given"); return true;
-			case ("System.IO.File", "ReadAllBytes") when Unwrap(args[0]) is string p1 && p1 == LocationPath:
-				result = File.ReadAllBytes(p1); return true;
 			case ("System.IO.File", "Exists") when Unwrap(args[0]) is string p2:
 				result = p2 == LocationPath ? 1 : 0; return true;
-			case ("System.IO.File", "OpenRead") when Unwrap(args[0]) is string p3 && p3 == LocationPath:
-				result = new MemoryStream(File.ReadAllBytes(p3), writable: false); return true;
 			case ("System.IO.FileStream", ".ctor")
 				when isNew && args.Length >= 2 && Unwrap(args[1]) is string p4 && p4 == LocationPath:
 				result = new MemoryStream(File.ReadAllBytes(p4), writable: false); return true;
@@ -96,17 +65,8 @@ internal static class ExternalModels
 				result = Module!.Assembly.PublicKeyToken?.Data ?? []; return true;
 			case ("System.Object", ".ctor"):
 				result = null; return true;
-			// Module/token plumbing answered statically from metadata.
-			case ("System.Reflection.Assembly", "GetModules"):
-				result = new object?[] { new IlEmulator.Marker("Module") }; return true;
-			case ("System.Reflection.Module", "get_ModuleHandle"):
-				result = new IlEmulator.Marker("ModuleHandle"); return true;
+			// Token plumbing answered statically from metadata.
 			case ("System.ModuleHandle", "GetRuntimeTypeHandleFromMetadataToken"):
-			case ("System.ModuleHandle", "GetRuntimeFieldHandleFromMetadataToken"):
-			case ("System.ModuleHandle", "GetRuntimeMethodHandleFromMetadataToken"):
-			case ("System.ModuleHandle", "ResolveTypeHandle"):
-			case ("System.ModuleHandle", "ResolveFieldHandle"):
-			case ("System.ModuleHandle", "ResolveMethodHandle"):
 				result = new IlEmulator.Marker("token", Module!.ResolveToken((uint)Convert.ToInt64(Unwrap(args[^1]))));
 				return true;
 			// Equality on reflection objects (Module/Assembly/Type/MemberInfo markers): reference comparison.
@@ -114,14 +74,9 @@ internal static class ExternalModels
 				result = ReferenceEquals(Unwrap(args[0]), Unwrap(args[1])) ? 1 : 0; return true;
 			case (_, "op_Inequality") when type.StartsWith("System.Reflection.") || type == "System.Type":
 				result = ReferenceEquals(Unwrap(args[0]), Unwrap(args[1])) ? 0 : 1; return true;
-			// Anti-analysis/environment queries: answered with fixed benign values, never forwarded.
+			// Anti-analysis query: answered with a fixed benign value, never forwarded.
 			case ("System.Diagnostics.Debugger", "get_IsAttached"):
-			case ("System.Diagnostics.Debugger", "IsLogging"):
 				result = 0; return true;
-			case ("System.Environment", "GetEnvironmentVariable"):
-				result = null; return true;
-			case ("System.Environment", "get_Version"):
-				result = new Version(8, 0, 0, 0); return true;
 			// Single-threaded emulation: locks are no-ops.
 			case ("System.Threading.Monitor", "Enter"):
 				if (args.Length == 2 && args[1] is IlEmulator.ByRef taken) taken.Set(1);
@@ -130,28 +85,7 @@ internal static class ExternalModels
 				result = null; return true;
 			// Global crypto configuration setter: modelled as a no-op so the real process setting is never touched.
 			case ("System.Security.Cryptography.RSACryptoServiceProvider", "set_UseMachineKeyStore"):
-			case ("System.Security.Cryptography.DSACryptoServiceProvider", "set_UseMachineKeyStore"):
 				result = null; return true;
-			// IntPtr is modelled as a plain 64-bit number (no real pointers are ever dereferenced).
-			case ("System.IntPtr", ".ctor") when args.Length == 2 && args[0] is IlEmulator.ByRef target:
-				target.Set(Convert.ToInt64(Unwrap(args[1]) ?? 0L)); return true;
-			case ("System.IntPtr", ".ctor") when isNew:
-				result = Convert.ToInt64(args[1]); return true;
-			case ("System.IntPtr", "ToInt64"):
-			case ("System.IntPtr", "ToInt32"):
-			case ("System.IntPtr", "op_Explicit"):
-			case ("System.IntPtr", "ToPointer"):
-				{
-					var v = Unwrap(args[0]);
-					var l = v is int i ? i : Convert.ToInt64(v ?? 0L);
-					result = name == "ToInt32" ? (int)l : l; return true;
-				}
-			case ("System.IntPtr", "get_Size"):
-				result = 8; return true;
-			case ("System.IntPtr", "op_Equality"):
-				result = Convert.ToInt64(args[0] ?? 0L) == Convert.ToInt64(args[1] ?? 0L) ? 1 : 0; return true;
-			case ("System.IntPtr", "op_Inequality"):
-				result = Convert.ToInt64(args[0] ?? 0L) != Convert.ToInt64(args[1] ?? 0L) ? 1 : 0; return true;
 			case ("System.Runtime.CompilerServices.RuntimeHelpers", "InitializeArray")
 				when args[0] is Array target && args[1] is IlEmulator.Marker { Payload: FieldDef fd }:
 				var data = fd.InitialValue ?? throw new InvalidOperationException("no field RVA data");
@@ -162,13 +96,8 @@ internal static class ExternalModels
 		if (!ForwardTypes.Contains(StripGeneric(type)))
 			return false;
 		// Emulator objects may only be stored in collections (opaque items); never passed to other BCL code.
-		var isCollection = StripGeneric(type) is "System.Collections.Generic.List`1"
-			or "System.Collections.Generic.Dictionary`2"
-			or "System.Collections.Hashtable" or "System.Array" or "System.Collections.Generic.Stack`1"
-			or "System.Collections.Generic.Queue`1" or "System.Collections.Generic.HashSet`1"
-			or "System.Collections.Generic.KeyValuePair`2" or "System.Collections.IList"
-			or "System.Collections.Generic.IList`1"
-			or "System.Collections.Generic.ICollection`1";
+		var isCollection = StripGeneric(type) is "System.Collections.Generic.List`1" or "System.Collections.Hashtable"
+			or "System.Array";
 		if (!isCollection && args.Any(a => a is IlEmulator.Marker or IlEmulator.ObjectInstance))
 			return false;
 
